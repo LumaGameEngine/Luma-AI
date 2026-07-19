@@ -1,0 +1,376 @@
+cat > ~/Bureau/Luma-AI/frontend/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luma AI Control Plane</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #0a0e17; }
+        .glow-text { text-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
+        .device-card { transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.05); }
+        .device-card:hover { border-color: rgba(0,255,136,0.2); transform: translateY(-2px); }
+        .status-badge { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-online { background: #00ff88; box-shadow: 0 0 10px #00ff8866; }
+        .status-offline { background: #ff4444; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0a0e17; }
+        ::-webkit-scrollbar-thumb { background: #00ff8844; border-radius: 2px; }
+        .tab-active { border-bottom: 2px solid #00ff88; color: #00ff88; }
+        .file-drop-zone { border: 2px dashed rgba(0,255,136,0.2); transition: all 0.3s; }
+        .file-drop-zone:hover, .file-drop-zone.dragover { border-color: #00ff88; background: rgba(0,255,136,0.05); }
+    </style>
+</head>
+<body>
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <div class="w-80 bg-[#0f1420] border-r border-white/5 p-4 flex flex-col">
+            <div class="flex items-center gap-2 mb-6">
+                <span class="text-2xl">🚀</span>
+                <h1 class="text-xl font-bold text-white glow-text">Luma <span class="text-[#00ff88]">AI</span></h1>
+                <span class="ml-auto text-xs text-[#00ff88]/60 bg-[#00ff88]/10 px-2 py-0.5 rounded-full">v0.2</span>
+            </div>
+            
+            <div class="flex items-center gap-2 text-sm text-gray-400 mb-4">
+                <span class="status-badge status-online"></span>
+                <span id="deviceCount">0 Devices</span>
+                <span class="ml-auto text-xs" id="lastUpdated">Updating...</span>
+            </div>
+
+            <!-- Device List -->
+            <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="deviceList">
+                <div class="text-center text-gray-600 text-sm mt-10">No devices connected yet.<br>Start your worker!</div>
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="border-t border-white/5 pt-3 mt-2 text-xs text-gray-600">
+                <span id="serverStatus">⚡ Coordinator: <span class="text-green-400">Online</span></span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col bg-[#0a0e17] overflow-hidden">
+            <!-- Tabs -->
+            <div class="flex border-b border-white/5 bg-[#0f1420]/50 px-6">
+                <button class="tab-active px-4 py-3 text-sm font-medium text-[#00ff88] transition" data-tab="dashboard">📊 Dashboard</button>
+                <button class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-300 transition" data-tab="models">🧠 Models</button>
+                <button class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-300 transition" data-tab="inference">💬 Inference</button>
+                <button class="px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-300 transition" data-tab="image">🖼️ Image Lab</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- Dashboard Tab -->
+                <div id="tab-dashboard" class="tab-content">
+                    <h2 class="text-2xl font-bold text-white mb-4">Control Plane</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="statsGrid">
+                        <div class="bg-[#0f1420] p-4 rounded-xl border border-white/5">
+                            <div class="text-gray-400 text-sm">Total Devices</div>
+                            <div class="text-2xl font-bold text-white" id="statDevices">0</div>
+                        </div>
+                        <div class="bg-[#0f1420] p-4 rounded-xl border border-white/5">
+                            <div class="text-gray-400 text-sm">Online Nodes</div>
+                            <div class="text-2xl font-bold text-[#00ff88]" id="statOnline">0</div>
+                        </div>
+                        <div class="bg-[#0f1420] p-4 rounded-xl border border-white/5">
+                            <div class="text-gray-400 text-sm">Avg CPU</div>
+                            <div class="text-2xl font-bold text-white" id="statAvgCpu">0%</div>
+                        </div>
+                    </div>
+                    <div class="bg-[#0f1420] p-4 rounded-xl border border-white/5">
+                        <h3 class="text-white font-medium mb-2">System Log</h3>
+                        <div class="h-40 overflow-y-auto bg-black/30 rounded-lg p-3 font-mono text-xs text-gray-400" id="logContainer">
+                            <div>[INFO] Luma AI coordinator started.</div>
+                            <div>[INFO] Waiting for workers...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Models Tab -->
+                <div id="tab-models" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold text-white mb-4">Model Manager</h2>
+                    <div class="file-drop-zone rounded-xl p-8 text-center text-gray-400 border-dashed border-2 border-white/10 bg-[#0f1420] mb-6" id="dropZone">
+                        <p class="text-lg"> Drop your .gguf model here</p>
+                        <p class="text-sm mt-1 text-gray-600">or click to browse</p>
+                        <input type="file" id="modelUpload" accept=".gguf" class="hidden" multiple>
+                        <button onclick="document.getElementById('modelUpload').click()" class="mt-4 bg-[#00ff88]/10 text-[#00ff88] px-4 py-2 rounded-lg text-sm hover:bg-[#00ff88]/20 transition">Select Model</button>
+                    </div>
+                    <div id="modelList" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="text-gray-500 text-sm">No models uploaded yet.</div>
+                    </div>
+                </div>
+
+                <!-- Inference Tab -->
+                <div id="tab-inference" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold text-white mb-4">Run Inference</h2>
+                    <div class="bg-[#0f1420] rounded-xl border border-white/5 p-4">
+                        <div class="mb-4">
+                            <label class="text-sm text-gray-400">Target Device</label>
+                            <select id="deviceSelect" class="w-full bg-black/50 text-white rounded-lg p-2 border border-white/10 mt-1">
+                                <option value="auto">Auto (Fastest available)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-sm text-gray-400">Prompt</label>
+                            <textarea id="promptInput" rows="3" class="w-full bg-black/50 text-white rounded-lg p-2 border border-white/10 mt-1 resize-none" placeholder="Enter your prompt here...">Hello, who are you?</textarea>
+                        </div>
+                        <button onclick="runInference()" class="mt-4 bg-[#00ff88] text-black font-semibold px-6 py-2 rounded-lg hover:bg-[#00ff88]/80 transition">
+                            ▶ Run
+                        </button>
+                        <div id="inferenceResult" class="mt-4 text-gray-300 whitespace-pre-wrap"></div>
+                    </div>
+                </div>
+
+                <!-- Image Lab Tab -->
+                <div id="tab-image" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold text-white mb-4">Image Processing Lab</h2>
+                    <div class="bg-[#0f1420] rounded-xl border border-white/5 p-4">
+                        <input type="file" id="imageUpload" accept="image/*" class="mb-4 text-gray-400">
+                        <div class="flex gap-4 flex-wrap">
+                            <button onclick="processImage('resize')" class="bg-blue-600/20 text-blue-400 px-4 py-2 rounded-lg text-sm hover:bg-blue-600/30 transition">🔄 Resize</button>
+                            <button onclick="processImage('grayscale')" class="bg-gray-600/20 text-gray-400 px-4 py-2 rounded-lg text-sm hover:bg-gray-600/30 transition">⚪ Grayscale</button>
+                            <button onclick="processImage('thumbnail')" class="bg-purple-600/20 text-purple-400 px-4 py-2 rounded-lg text-sm hover:bg-purple-600/30 transition">📐 Thumbnail</button>
+                        </div>
+                        <div id="imageResult" class="mt-4 flex flex-col items-center">
+                            <img id="processedImage" class="max-w-full max-h-96 rounded-lg border border-white/10 hidden" />
+                            <div id="imageMeta" class="text-sm text-gray-500 mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Global State ---
+        let devices = {};
+        let logEntries = [];
+
+        // --- Tab Switching ---
+        document.querySelectorAll('[data-tab]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('tab-active'));
+                this.classList.add('tab-active');
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+                document.getElementById('tab-' + tab).classList.remove('hidden');
+            });
+        });
+
+        // --- Fetch Devices ---
+        async function fetchDevices() {
+            try {
+                const res = await fetch('/api/devices');
+                const data = await res.json();
+                devices = data;
+                renderDevices();
+                updateStats();
+                updateDeviceSelect();
+            } catch (e) {
+                console.error('Failed to fetch devices:', e);
+            }
+        }
+
+        // --- Render Device List ---
+        function renderDevices() {
+            const container = document.getElementById('deviceList');
+            const ids = Object.keys(devices);
+            if (ids.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-600 text-sm mt-10">No devices connected yet.<br>Start your worker!</div>';
+                return;
+            }
+            let html = '';
+            for (const id of ids) {
+                const d = devices[id];
+                const m = d.metrics || {};
+                const status = d.status === 'online' ? 'status-online' : 'status-offline';
+                html += `
+                    <div class="device-card bg-[#131b2e] rounded-lg p-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="status-badge ${status}"></span>
+                                <span class="text-white text-sm font-medium">${d.name}</span>
+                            </div>
+                            <span class="text-xs text-gray-500">${d.arch}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1 mt-2 text-xs text-gray-400">
+                            <span>CPU ${m.cpu_usage || '?'}%</span>
+                            <span>RAM ${m.ram_free || '?'}MB</span>
+                            <span>Bat ${m.battery || '?'}%</span>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        // --- Update Stats ---
+        function updateStats() {
+            const ids = Object.keys(devices);
+            const online = ids.filter(id => devices[id].status === 'online');
+            document.getElementById('deviceCount').textContent = `${ids.length} Devices`;
+            document.getElementById('statDevices').textContent = ids.length;
+            document.getElementById('statOnline').textContent = online.length;
+            
+            let totalCpu = 0;
+            let count = 0;
+            for (const id of online) {
+                const cpu = devices[id].metrics?.cpu_usage;
+                if (cpu !== undefined) { totalCpu += cpu; count++; }
+            }
+            const avg = count > 0 ? (totalCpu / count).toFixed(1) : 0;
+            document.getElementById('statAvgCpu').textContent = avg + '%';
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+        }
+
+        // --- Update Device Select (for Inference) ---
+        function updateDeviceSelect() {
+            const select = document.getElementById('deviceSelect');
+            const currentVal = select.value;
+            select.innerHTML = '<option value="auto">Auto (Fastest available)</option>';
+            for (const id of Object.keys(devices)) {
+                if (devices[id].status === 'online') {
+                    const opt = document.createElement('option');
+                    opt.value = id;
+                    opt.textContent = devices[id].name;
+                    select.appendChild(opt);
+                }
+            }
+            if (currentVal) select.value = currentVal;
+        }
+
+        // --- Model Upload ---
+        document.getElementById('modelUpload').addEventListener('change', async function(e) {
+            const files = this.files;
+            if (files.length === 0) return;
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                try {
+                    const res = await fetch('/api/models/upload', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    addLog(`[MODEL] Uploaded ${data.filename} (${data.size_mb} MB)`);
+                    fetchModels();
+                } catch (err) {
+                    addLog(`[ERROR] Upload failed: ${err.message}`);
+                }
+            }
+            this.value = '';
+        });
+
+        // --- Fetch Models ---
+        async function fetchModels() {
+            try {
+                const res = await fetch('/api/models');
+                const data = await res.json();
+                const container = document.getElementById('modelList');
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="text-gray-500 text-sm col-span-2">No models uploaded yet.</div>';
+                    return;
+                }
+                let html = '';
+                for (const m of data) {
+                    html += `<div class="bg-[#0f1420] p-3 rounded-lg border border-white/5 flex justify-between items-center">
+                                <div>
+                                    <div class="text-white font-mono text-sm">${m.name}</div>
+                                    <div class="text-xs text-gray-500">${m.size_mb} MB</div>
+                                </div>
+                                <button class="text-xs text-[#00ff88]/60 hover:text-[#00ff88]">Load</button>
+                            </div>`;
+                }
+                container.innerHTML = html;
+            } catch (e) { console.error(e); }
+        }
+
+        // --- Inference ---
+        async function runInference() {
+            const prompt = document.getElementById('promptInput').value;
+            const device = document.getElementById('deviceSelect').value;
+            const resultDiv = document.getElementById('inferenceResult');
+            resultDiv.innerHTML = '<span class="text-gray-500">⏳ Queuing inference...</span>';
+            try {
+                const res = await fetch('/api/inference', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, device_id: device === 'auto' ? null : device })
+                });
+                const data = await res.json();
+                resultDiv.innerHTML = `<div class="bg-black/30 p-3 rounded-lg"><span class="text-[#00ff88]">✅ ${data.message}</span>\n\n📝 "${data.prompt}"\n\n📡 Assigned to: <span class="text-white font-mono">${data.device_id}</span></div>`;
+                addLog(`[INFERENCE] Prompt sent to ${data.device_id}`);
+            } catch (e) {
+                resultDiv.innerHTML = `<span class="text-red-400"> Error: ${e.message}</span>`;
+            }
+        }
+
+        // --- Image Processing ---
+        async function processImage(operation) {
+            const fileInput = document.getElementById('imageUpload');
+            const file = fileInput.files[0];
+            if (!file) { alert('Please select an image first.'); return; }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('operation', operation);
+            formData.append('width', 256);
+            formData.append('height', 256);
+
+            try {
+                const res = await fetch('/api/image/process', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    const img = document.getElementById('processedImage');
+                    img.src = 'data:image/png;base64,' + data.image_base64;
+                    img.classList.remove('hidden');
+                    document.getElementById('imageMeta').innerHTML = `
+                        <span class="text-[#00ff88]">${data.operation}</span> 
+                        | Original: ${data.original_size.join('x')} 
+                        | New: ${data.new_size.join('x')}
+                    `;
+                    addLog(`[IMAGE] Processed image (${data.operation})`);
+                }
+            } catch (e) {
+                alert('Image processing failed: ' + e.message);
+            }
+        }
+
+        // --- Add Log ---
+        function addLog(msg) {
+            const container = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+            container.innerHTML += `<div>[${time}] ${msg}</div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- Drag and Drop for Models ---
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const input = document.getElementById('modelUpload');
+                const dt = new DataTransfer();
+                for (const f of files) dt.items.add(f);
+                input.files = dt.files;
+                input.dispatchEvent(new Event('change'));
+            }
+        });
+        dropZone.addEventListener('click', () => document.getElementById('modelUpload').click());
+
+        // --- Polling ---
+        setInterval(fetchDevices, 3000);
+        fetchDevices();
+        fetchModels();
+
+        // Log startup
+        addLog('[INFO] UI loaded successfully.');
+        addLog('[INFO] Polling for devices every 3s.');
+    </script>
+</body>
+</html>
+EOF
