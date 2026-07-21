@@ -1,0 +1,12 @@
+#!/bin/bash
+echo "To add a new worker:"
+echo "1. Install Termux on the Android device."
+echo "2. Run the following commands on the device:"
+echo ""
+echo "   pkg update && pkg install python git openssh"
+echo "   git clone https://github.com/LumaGameEngine/Luma-AI.git"
+echo "   cd Luma-AI/worker"
+echo "   python client.py --server http://<coordinator-ip>:8000 --name <device-name>"
+echo ""
+echo "3. Ensure the device is on the same Wi-Fi network."
+echo "4. The coordinator IP is: $(hostname -I | awk '{print $1}')"
