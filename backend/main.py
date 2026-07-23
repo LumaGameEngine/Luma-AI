@@ -2,22 +2,22 @@ import os
 import io
 import shutil
 import base64
+import httpx
 from datetime import datetime
 from typing import Dict, Optional
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
-import httpx
 
 STORAGE_PATH = "storage"
 MODELS_PATH = os.path.join(STORAGE_PATH, "models")
 os.makedirs(MODELS_PATH, exist_ok=True)
 os.makedirs(STORAGE_PATH, exist_ok=True)
 
-app = FastAPI(title="Luma AI - Control Plane")
+app = FastAPI(title="Luma AI - Control Panel")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,7 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- API routes first ----
 devices: Dict[str, dict] = {}
 
 class DeviceRegister(BaseModel):
@@ -47,6 +46,7 @@ class Heartbeat(BaseModel):
 class InferenceRequest(BaseModel):
     prompt: str
     device_id: Optional[str] = None
+    model: Optional[str] = None
 
 @app.post("/api/register")
 async def register(device: DeviceRegister):
@@ -60,7 +60,8 @@ async def register(device: DeviceRegister):
         "ip": device.ip,
         "status": "online",
         "last_seen": datetime.now().isoformat(),
-        "metrics": {}
+        "metrics": {},
+        "current_model": None
     }
     print(f"[REGISTER] {device.name} ({device.device_id}) joined from {device.ip}")
     return {"status": "success", "message": f"Welcome {device.name}!"}
@@ -111,6 +112,36 @@ async def upload_model(file: UploadFile = File(...)):
     size_mb = os.path.getsize(file_path) // (1024 * 1024)
     return {"status": "ok", "filename": os.path.basename(file_path), "size_mb": size_mb}
 
+@app.post("/api/models/download")
+async def download_model(request: Request):
+    data = await request.json()
+    url = data.get("url")
+    filename = data.get("filename")
+    if not url or not filename:
+        raise HTTPException(400, "Missing 'url' or 'filename'")
+    if not url.endswith('.gguf') or 'huggingface.co' not in url:
+        raise HTTPException(400, "Only .gguf from huggingface.co allowed")
+    file_path = os.path.join(MODELS_PATH, filename)
+    if os.path.exists(file_path):
+        raise HTTPException(400, f"File '{filename}' already exists")
+    async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:
+        try:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                raise HTTPException(502, f"Download failed: {resp.status_code}")
+            with open(file_path, "wb") as f:
+                f.write(resp.content)
+            size_mb = os.path.getsize(file_path) // (1024 * 1024)
+            return {"status": "ok", "filename": filename, "size_mb": size_mb}
+        except httpx.TimeoutException:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(504, "Download timed out")
+        except Exception as e:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(500, f"Download failed: {str(e)}")
+
 @app.post("/api/image/process")
 async def process_image(
     file: UploadFile = File(...),
@@ -144,22 +175,83 @@ async def process_image(
     except Exception as e:
         raise HTTPException(500, f"Image processing failed: {str(e)}")
 
+@app.get("/api/worker/models")
+async def get_worker_models(device_id: str):
+    device = devices.get(device_id)
+    if not device:
+        raise HTTPException(404, "Device not found")
+    phone_ip = device.get("ip")
+    if not phone_ip:
+        raise HTTPException(500, "Device IP not known")
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            resp = await client.get(f"http://{phone_ip}:8080/models")
+            if resp.status_code != 200:
+                raise HTTPException(502, f"Worker error: {resp.text}")
+            return resp.json()
+        except httpx.TimeoutException:
+            raise HTTPException(504, "Worker not responding")
+
+@app.post("/api/worker/switch_model")
+async def switch_worker_model(request: Request):
+    data = await request.json()
+    device_id = data.get("device_id")
+    model = data.get("model")
+    if not device_id or not model:
+        raise HTTPException(400, "Missing device_id or model")
+    device = devices.get(device_id)
+    if not device:
+        raise HTTPException(404, "Device not found")
+    phone_ip = device.get("ip")
+    if not phone_ip:
+        raise HTTPException(500, "Device IP not known")
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            resp = await client.post(
+                f"http://{phone_ip}:8080/switch_model",
+                json={"model": model}
+            )
+            if resp.status_code != 200:
+                raise HTTPException(502, f"Worker error: {resp.text}")
+            devices[device_id]["current_model"] = model
+            return resp.json()
+        except httpx.TimeoutException:
+            raise HTTPException(504, "Model switch timed out")
+
 @app.post("/api/inference")
 async def run_inference(req: InferenceRequest):
     if not req.device_id:
         online = [k for k, v in devices.items() if v.get("status") == "online"]
         if not online:
-            raise HTTPException(503, "No online devices available")
+            raise HTTPException(503, "No online devices")
         req.device_id = online[0]
+
     device = devices.get(req.device_id)
-    if not device:
-        raise HTTPException(404, "Device not found")
-    if device.get("status") != "online":
-        raise HTTPException(503, "Device is offline")
+    if not device or device.get("status") != "online":
+        raise HTTPException(404, "Device not found or offline")
+
     phone_ip = device.get("ip")
     if not phone_ip:
         raise HTTPException(500, "Device IP not known")
-    async with httpx.AsyncClient(timeout=60.0) as client:
+
+    # Switch model if needed
+    if req.model:
+        current = device.get("current_model")
+        if current != req.model:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                try:
+                    resp = await client.post(
+                        f"http://{phone_ip}:8080/switch_model",
+                        json={"model": req.model}
+                    )
+                    if resp.status_code != 200:
+                        raise HTTPException(502, f"Model switch failed: {resp.text}")
+                    devices[req.device_id]["current_model"] = req.model
+                except httpx.TimeoutException:
+                    raise HTTPException(504, "Model switch timed out")
+
+    # Run inference
+    async with httpx.AsyncClient(timeout=120.0) as client:
         try:
             resp = await client.post(
                 f"http://{phone_ip}:8080/infer",
@@ -168,14 +260,16 @@ async def run_inference(req: InferenceRequest):
             if resp.status_code != 200:
                 raise HTTPException(502, f"Inference server error: {resp.text}")
             result = resp.json()
+            response_text = result.get("response", "No response from model.")
             return {
                 "status": "success",
                 "device_id": req.device_id,
-                "response": result.get("response", ""),
-                "prompt": req.prompt
+                "response": response_text,
+                "prompt": req.prompt,
+                "model": req.model or device.get("current_model")
             }
         except httpx.TimeoutException:
-            raise HTTPException(504, "Inference timed out on device")
+            raise HTTPException(504, "Inference timed out")
         except Exception as e:
             raise HTTPException(500, f"Failed to forward inference: {str(e)}")
 
@@ -183,9 +277,6 @@ async def run_inference(req: InferenceRequest):
 async def health():
     return {"status": "running", "devices": len(devices)}
 
-# ---- Serve frontend files from the root ----
-# API routes are defined above, so they take precedence.
-# Mount the frontend folder at "/" – this serves index.html, style.css, app.js, etc.
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 if __name__ == "__main__":

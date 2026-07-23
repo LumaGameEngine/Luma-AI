@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Luma AI – Control Plane</title>
+  <title>Luma AI – Control Panel</title>
   <link rel="stylesheet" href="style.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap" rel="stylesheet" />
 </head>
 <body>
 <div class="app-container">
+  <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <span class="logo">Luma <span>AI</span></span>
@@ -16,7 +17,7 @@
         <select id="themeSelect">
           <option value="dark">Dark</option>
           <option value="light">Light</option>
-          <option value="luma">Luma</option>
+          <option value="luma" selected>Luma</option>
           <option value="custom">Custom</option>
         </select>
       </span>
@@ -37,18 +38,23 @@
     </div>
   </aside>
 
+  <!-- ===== MAIN ===== -->
   <main class="main">
+    <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn" data-tab="models">Models</button>
-      <button class="tab-btn" data-tab="inference">Inference</button>
+      <button class="tab-btn" data-tab="chat">Chat</button>
       <button class="tab-btn" data-tab="image">Image Lab</button>
+      <button class="tab-btn" data-tab="theme">Theme</button>
     </div>
 
     <div class="tab-content">
+
+      <!-- ===== DASHBOARD ===== -->
       <section id="tab-dashboard" class="tab-pane active">
-        <h2>Control Plane</h2>
-        <div class="stats-grid" id="statsGrid">
+        <h2>Control Panel</h2>
+        <div class="stats-grid">
           <div class="stat-box"><div class="stat-label">Total Devices</div><div class="stat-value" id="statDevices">0</div></div>
           <div class="stat-box"><div class="stat-label">Online Nodes</div><div class="stat-value" id="statOnline">0</div></div>
           <div class="stat-box"><div class="stat-label">Avg CPU</div><div class="stat-value" id="statAvgCpu">0%</div></div>
@@ -62,37 +68,74 @@
         </div>
       </section>
 
+      <!-- ===== MODELS ===== -->
       <section id="tab-models" class="tab-pane" style="display:none;">
         <h2>Model Manager</h2>
+
+        <!-- Upload via drag/drop -->
         <div class="drop-zone" id="dropZone">
           <p>Drop your .gguf model here</p>
           <p style="font-size:0.8rem; color:var(--text-muted);">or click to browse</p>
           <input type="file" id="modelUpload" accept=".gguf" multiple style="display:none;" />
           <button class="secondary" onclick="document.getElementById('modelUpload').click()">Select Model</button>
         </div>
-        <div id="modelList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:0.75rem;">
+
+        <!-- Download from URL -->
+        <div class="card" style="margin-top:1rem;">
+          <div class="card-title">Download from URL</div>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="text" id="modelUrlInput" placeholder="https://huggingface.co/.../model.gguf" style="flex:1;" />
+            <button onclick="downloadModel()">Download</button>
+          </div>
+        </div>
+
+        <!-- Active downloads -->
+        <div id="downloadsList"></div>
+
+        <!-- Uploaded models -->
+        <div id="modelList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:0.75rem; margin-top:1rem;">
           <div class="empty-state">No models uploaded yet.</div>
         </div>
       </section>
 
-      <section id="tab-inference" class="tab-pane" style="display:none;">
-        <h2>Run Inference</h2>
+      <!-- ===== CHAT ===== -->
+      <section id="tab-chat" class="tab-pane" style="display:none;">
+        <h2>Chat</h2>
         <div class="card">
-          <div style="margin-bottom:1rem;">
-            <label style="font-size:0.9rem; color:var(--text-muted);">Target Device</label>
-            <select id="deviceSelect">
-              <option value="auto">Auto (fastest available)</option>
-            </select>
+          <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <div style="flex:1; min-width:150px;">
+              <label style="font-size:0.8rem; color:var(--text-muted);">Target Device</label>
+              <select id="chatDeviceSelect">
+                <option value="auto">Auto (fastest available)</option>
+              </select>
+            </div>
+            <div style="flex:1; min-width:150px;">
+              <label style="font-size:0.8rem; color:var(--text-muted);">Model</label>
+              <select id="chatModelSelect">
+                <option value="">Select a model</option>
+              </select>
+            </div>
+            <div style="display:flex; align-items:flex-end; gap:0.5rem;">
+              <button class="secondary" onclick="clearChat()">Clear Chat</button>
+            </div>
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="font-size:0.9rem; color:var(--text-muted);">Prompt</label>
-            <textarea id="promptInput" rows="3" style="resize:vertical;">Hello, who are you?</textarea>
+
+          <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+              <div class="chat-message assistant">
+                <div class="role">assistant</div>
+                <div class="content">Hello! I'm Luma AI. How can I help you today?</div>
+              </div>
+            </div>
+            <div class="chat-input-row">
+              <textarea id="chatInput" rows="2" placeholder="Type your message..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+              <button onclick="sendChat()">Send</button>
+            </div>
           </div>
-          <button onclick="runInference()">Run</button>
-          <div id="inferenceResult" style="margin-top:1rem; color:var(--text-secondary); white-space:pre-wrap;"></div>
         </div>
       </section>
 
+      <!-- ===== IMAGE LAB ===== -->
       <section id="tab-image" class="tab-pane" style="display:none;">
         <h2>Image Processing Lab</h2>
         <div class="card">
@@ -108,6 +151,44 @@
           </div>
         </div>
       </section>
+
+      <!-- ===== THEME CUSTOMIZER ===== -->
+      <section id="tab-theme" class="tab-pane" style="display:none;">
+        <h2>Theme Customizer</h2>
+        <div class="card">
+          <div class="card-title">Custom Theme</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Background Primary</label>
+              <input type="color" id="customBgPrimary" value="#0d0a14" />
+            </div>
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Background Secondary</label>
+              <input type="color" id="customBgSecondary" value="#140f1e" />
+            </div>
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Accent Color</label>
+              <input type="color" id="customAccent" value="#ff6b9d" />
+            </div>
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-muted);">Text Primary</label>
+              <input type="color" id="customTextPrimary" value="#f0e8f5" />
+            </div>
+          </div>
+          <button onclick="applyCustomTheme()" style="margin-top:1rem;">Apply Custom Theme</button>
+          <button class="secondary" onclick="resetCustomTheme()" style="margin-top:0.5rem; margin-left:0.5rem;">Reset to Luma</button>
+        </div>
+        <div class="card">
+          <div class="card-title">Preview</div>
+          <div id="themePreview" style="padding:1rem; border-radius:8px; border:1px solid var(--border);">
+            <p style="color:var(--text-primary);">This is how your theme looks.</p>
+            <p style="color:var(--text-secondary);">Secondary text.</p>
+            <p style="color:var(--text-muted);">Muted text.</p>
+            <button style="background:var(--accent);">Accent Button</button>
+          </div>
+        </div>
+      </section>
+
     </div>
   </main>
 </div>
