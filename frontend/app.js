@@ -138,7 +138,7 @@ document.getElementById('chatDeviceSelect').addEventListener('change', function(
   document.getElementById('chatModelSelect').disabled = false;
 });
 
-// ----- Model Upload & Download (coordinator storage) -----
+// ----- Model Upload & List (coordinator) -----
 document.getElementById('modelUpload').addEventListener('change', async function(e) {
   const files = this.files;
   if (!files.length) return;
@@ -173,7 +173,7 @@ async function fetchModels() {
         <button class="secondary" style="margin-top:0.5rem; font-size:0.7rem;" onclick="selectModel('${m.name}')">Select</button>
       </div>
     `).join('');
-    // Update chat model dropdown (optional)
+    // Update chat model dropdown
     const chatSelect = document.getElementById('chatModelSelect');
     if (chatSelect && chatSelect.options.length <= 1) {
       const workerModels = chatSelect.querySelectorAll('option:not([value=""])');
@@ -224,48 +224,16 @@ async function downloadModel() {
       const err = await res.json();
       throw new Error(err.detail || 'Download failed');
     }
-    const reader = res.body.getReader();
-    const contentLength = res.headers.get('content-length');
-    const total = contentLength ? parseInt(contentLength) : 0;
-    let loaded = 0;
-    const chunks = [];
-    while (true) {
-      if (activeDownloads[filename]?.cancelled) {
-        reader.cancel();
-        document.getElementById('status-' + filename).textContent = 'Cancelled';
-        document.getElementById('progress-' + filename).style.width = '0%';
-        delete activeDownloads[filename];
-        setTimeout(() => { const el = document.getElementById('dl-' + filename); if (el) el.remove(); }, 2000);
-        return;
-      }
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.length;
-      if (total) {
-        const pct = Math.min(100, (loaded / total) * 100);
-        document.getElementById('progress-' + filename).style.width = pct + '%';
-        document.getElementById('status-' + filename).textContent =
-          `Downloading... ${Math.round(pct)}% (${(loaded/1024/1024).toFixed(1)} MB / ${(total/1024/1024).toFixed(1)} MB)`;
-      } else {
-        document.getElementById('status-' + filename).textContent =
-          `Downloading... ${(loaded/1024/1024).toFixed(1)} MB`;
-      }
-    }
-    const blob = new Blob(chunks);
-    const formData = new FormData();
-    formData.append('file', blob, filename);
-    const uploadRes = await fetch('/api/models/upload', { method: 'POST', body: formData });
-    const uploadData = await uploadRes.json();
-    document.getElementById('status-' + filename).textContent = '✅ Done!';
+    const data = await res.json();
+    document.getElementById('status-' + filename).textContent = 'Done!';
     document.getElementById('progress-' + filename).style.width = '100%';
-    addLog(`[MODEL] Downloaded ${filename} (${uploadData.size_mb} MB)`);
+    addLog(`[MODEL] Downloaded ${data.filename} (${data.size_mb} MB)`);
     fetchModels();
     const actions = item.querySelector('.actions');
-    actions.innerHTML = `<span style="color:var(--accent);">✓ Complete</span>`;
+    actions.innerHTML = `<span style="color:var(--accent);">Complete</span>`;
     delete activeDownloads[filename];
   } catch (err) {
-    document.getElementById('status-' + filename).textContent = '❌ Failed: ' + err.message;
+    document.getElementById('status-' + filename).textContent = 'Failed: ' + err.message;
     document.getElementById('progress-' + filename).style.width = '0%';
     const actions = item.querySelector('.actions');
     actions.innerHTML = `
@@ -311,7 +279,7 @@ async function sendChat() {
   const assistantMsg = document.createElement('div');
   assistantMsg.className = 'chat-message assistant';
   assistantMsg.id = 'chat-assistant-response';
-  assistantMsg.innerHTML = `<div class="role">assistant</div><div class="content">⏳ Thinking...</div>`;
+  assistantMsg.innerHTML = `<div class="role">assistant</div><div class="content">Thinking...</div>`;
   messages.appendChild(assistantMsg);
   messages.scrollTop = messages.scrollHeight;
 
@@ -338,11 +306,11 @@ async function sendChat() {
       addLog(`[CHAT] Response from ${data.device_id || 'unknown'} (model: ${data.model || 'default'})`);
     } else {
       document.getElementById('chat-assistant-response').innerHTML =
-        `<div class="role">assistant</div><div class="content" style="color:#ff6b6b;">❌ Error: ${data.detail || 'Unknown error'}</div>`;
+        `<div class="role">assistant</div><div class="content" style="color:#ff6b6b;">Error: ${data.detail || 'Unknown error'}</div>`;
     }
   } catch (e) {
     document.getElementById('chat-assistant-response').innerHTML =
-      `<div class="role">assistant</div><div class="content" style="color:#ff6b6b;">❌ Error: ${e.message}</div>`;
+      `<div class="role">assistant</div><div class="content" style="color:#ff6b6b;">Error: ${e.message}</div>`;
   }
   messages.scrollTop = messages.scrollHeight;
 }

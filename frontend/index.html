@@ -9,7 +9,6 @@
 </head>
 <body>
 <div class="app-container">
-  <!-- ===== SIDEBAR ===== -->
   <aside class="sidebar">
     <div class="sidebar-header">
       <span class="logo">Luma <span>AI</span></span>
@@ -22,25 +21,18 @@
         </select>
       </span>
     </div>
-
     <div class="device-status">
       <span class="status-badge status-online"></span>
       <span id="deviceCount">0 Devices</span>
       <span class="last-updated" id="lastUpdated">Updating...</span>
     </div>
-
     <div class="device-list" id="deviceList">
       <div class="empty-state">No devices connected yet.<br />Start your worker!</div>
     </div>
-
-    <div class="sidebar-footer">
-      Coordinator: <span id="serverStatus">Online</span>
-    </div>
+    <div class="sidebar-footer">Coordinator: <span id="serverStatus">Online</span></div>
   </aside>
 
-  <!-- ===== MAIN ===== -->
   <main class="main">
-    <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn" data-tab="models">Models</button>
@@ -50,8 +42,7 @@
     </div>
 
     <div class="tab-content">
-
-      <!-- ===== DASHBOARD ===== -->
+      <!-- Dashboard -->
       <section id="tab-dashboard" class="tab-pane active">
         <h2>Control Panel</h2>
         <div class="stats-grid">
@@ -61,26 +52,19 @@
         </div>
         <div class="card">
           <div class="card-title">System Log</div>
-          <div class="log-container" id="logContainer">
-            <div>[INFO] Luma AI coordinator started.</div>
-            <div>[INFO] Waiting for workers...</div>
-          </div>
+          <div class="log-container" id="logContainer"><div>[INFO] Luma AI coordinator started.</div></div>
         </div>
       </section>
 
-      <!-- ===== MODELS ===== -->
+      <!-- Models -->
       <section id="tab-models" class="tab-pane" style="display:none;">
         <h2>Model Manager</h2>
-
-        <!-- Upload via drag/drop -->
         <div class="drop-zone" id="dropZone">
           <p>Drop your .gguf model here</p>
           <p style="font-size:0.8rem; color:var(--text-muted);">or click to browse</p>
           <input type="file" id="modelUpload" accept=".gguf" multiple style="display:none;" />
           <button class="secondary" onclick="document.getElementById('modelUpload').click()">Select Model</button>
         </div>
-
-        <!-- Download from URL -->
         <div class="card" style="margin-top:1rem;">
           <div class="card-title">Download from URL</div>
           <div style="display:flex; gap:0.5rem;">
@@ -88,44 +72,30 @@
             <button onclick="downloadModel()">Download</button>
           </div>
         </div>
-
-        <!-- Active downloads -->
         <div id="downloadsList"></div>
-
-        <!-- Uploaded models -->
-        <div id="modelList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:0.75rem; margin-top:1rem;">
-          <div class="empty-state">No models uploaded yet.</div>
-        </div>
+        <div id="modelList" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:0.75rem; margin-top:1rem;"></div>
       </section>
 
-      <!-- ===== CHAT ===== -->
+      <!-- Chat -->
       <section id="tab-chat" class="tab-pane" style="display:none;">
         <h2>Chat</h2>
         <div class="card">
           <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
             <div style="flex:1; min-width:150px;">
               <label style="font-size:0.8rem; color:var(--text-muted);">Target Device</label>
-              <select id="chatDeviceSelect">
-                <option value="auto">Auto (fastest available)</option>
-              </select>
+              <select id="chatDeviceSelect"><option value="auto">Auto (fastest available)</option></select>
             </div>
             <div style="flex:1; min-width:150px;">
               <label style="font-size:0.8rem; color:var(--text-muted);">Model</label>
-              <select id="chatModelSelect">
-                <option value="">Select a model</option>
-              </select>
+              <select id="chatModelSelect"><option value="">Select a model</option></select>
             </div>
             <div style="display:flex; align-items:flex-end; gap:0.5rem;">
               <button class="secondary" onclick="clearChat()">Clear Chat</button>
             </div>
           </div>
-
           <div class="chat-container">
             <div class="chat-messages" id="chatMessages">
-              <div class="chat-message assistant">
-                <div class="role">assistant</div>
-                <div class="content">Hello! I'm Luma AI. How can I help you today?</div>
-              </div>
+              <div class="chat-message assistant"><div class="role">assistant</div><div class="content">Hello! I'm Luma AI. How can I help you today?</div></div>
             </div>
             <div class="chat-input-row">
               <textarea id="chatInput" rows="2" placeholder="Type your message..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
@@ -135,7 +105,7 @@
         </div>
       </section>
 
-      <!-- ===== IMAGE LAB ===== -->
+      <!-- Image Lab -->
       <section id="tab-image" class="tab-pane" style="display:none;">
         <h2>Image Processing Lab</h2>
         <div class="card">
@@ -152,28 +122,16 @@
         </div>
       </section>
 
-      <!-- ===== THEME CUSTOMIZER ===== -->
+      <!-- Theme -->
       <section id="tab-theme" class="tab-pane" style="display:none;">
         <h2>Theme Customizer</h2>
         <div class="card">
           <div class="card-title">Custom Theme</div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-            <div>
-              <label style="font-size:0.8rem; color:var(--text-muted);">Background Primary</label>
-              <input type="color" id="customBgPrimary" value="#0d0a14" />
-            </div>
-            <div>
-              <label style="font-size:0.8rem; color:var(--text-muted);">Background Secondary</label>
-              <input type="color" id="customBgSecondary" value="#140f1e" />
-            </div>
-            <div>
-              <label style="font-size:0.8rem; color:var(--text-muted);">Accent Color</label>
-              <input type="color" id="customAccent" value="#ff6b9d" />
-            </div>
-            <div>
-              <label style="font-size:0.8rem; color:var(--text-muted);">Text Primary</label>
-              <input type="color" id="customTextPrimary" value="#f0e8f5" />
-            </div>
+            <div><label style="font-size:0.8rem; color:var(--text-muted);">Background Primary</label><input type="color" id="customBgPrimary" value="#0d0a14" /></div>
+            <div><label style="font-size:0.8rem; color:var(--text-muted);">Background Secondary</label><input type="color" id="customBgSecondary" value="#140f1e" /></div>
+            <div><label style="font-size:0.8rem; color:var(--text-muted);">Accent Color</label><input type="color" id="customAccent" value="#ff6b9d" /></div>
+            <div><label style="font-size:0.8rem; color:var(--text-muted);">Text Primary</label><input type="color" id="customTextPrimary" value="#f0e8f5" /></div>
           </div>
           <button onclick="applyCustomTheme()" style="margin-top:1rem;">Apply Custom Theme</button>
           <button class="secondary" onclick="resetCustomTheme()" style="margin-top:0.5rem; margin-left:0.5rem;">Reset to Luma</button>
@@ -188,7 +146,6 @@
           </div>
         </div>
       </section>
-
     </div>
   </main>
 </div>

@@ -1,4 +1,3 @@
-/* ===== CSS Variables & Themes ===== */
 :root {
   --bg-primary: #0a0e17;
   --bg-secondary: #0f1420;
@@ -29,7 +28,6 @@
   --shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
-/* ===== LUMA THEME — Dark Pink (matches lumagameengine.github.io) ===== */
 [data-theme="luma"] {
   --bg-primary: #0d0a14;
   --bg-secondary: #140f1e;
@@ -45,7 +43,6 @@
   --shadow: 0 8px 32px rgba(255, 107, 157, 0.08);
 }
 
-/* ===== Base ===== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
   background: var(--bg-primary);
@@ -58,7 +55,6 @@ a { color: var(--accent); }
 
 .app-container { display: flex; height: 100vh; overflow: hidden; }
 
-/* ===== Sidebar ===== */
 .sidebar {
   width: 280px;
   background: var(--bg-secondary);
@@ -135,7 +131,6 @@ a { color: var(--accent); }
   color: var(--text-muted);
 }
 
-/* ===== Main ===== */
 .main {
   flex: 1;
   display: flex;
@@ -174,7 +169,6 @@ a { color: var(--accent); }
   padding: 1.5rem;
 }
 
-/* ===== Cards & Stats ===== */
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -200,7 +194,6 @@ a { color: var(--accent); }
 .stat-label { font-size: 0.8rem; color: var(--text-muted); }
 .stat-value { font-size: 2rem; font-weight: 700; color: var(--text-primary); }
 
-/* ===== Forms ===== */
 input, select, textarea {
   background: var(--bg-input);
   color: var(--text-primary);
@@ -237,7 +230,6 @@ button.danger {
 }
 button.danger:hover { background: #e55555; }
 
-/* ===== Drop Zone ===== */
 .drop-zone {
   border: 2px dashed var(--border);
   border-radius: var(--radius);
@@ -253,7 +245,6 @@ button.danger:hover { background: #e55555; }
   background: var(--accent-dim);
 }
 
-/* ===== Log ===== */
 .log-container {
   background: var(--bg-card);
   border-radius: 8px;
@@ -265,7 +256,6 @@ button.danger:hover { background: #e55555; }
   color: var(--text-secondary);
 }
 
-/* ===== Chat ===== */
 .chat-container {
   display: flex;
   flex-direction: column;
@@ -326,7 +316,6 @@ button.danger:hover { background: #e55555; }
   align-self: flex-end;
 }
 
-/* ===== Model Download Progress ===== */
 .download-item {
   background: var(--bg-card);
   padding: 1rem;
@@ -367,7 +356,6 @@ button.danger:hover { background: #e55555; }
   padding: 2rem 0;
 }
 
-/* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--accent-dim); border-radius: 2px; }
