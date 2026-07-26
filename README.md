@@ -784,3 +784,5 @@ The long-term objective is to build a complete distributed AI ecosystem that any
 Old devices deserve a second life.
 
 Luma AI gives them one.
+
+Made with ♥️ by Princeflouz :)
