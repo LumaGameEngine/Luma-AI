@@ -99,7 +99,7 @@ function updateDeviceSelects() {
   }
 }
 
-// ----- Worker Models -----
+// ----- Worker Models (sync) -----
 async function fetchWorkerModels(deviceId) {
   if (!deviceId || deviceId === 'auto') {
     document.getElementById('chatModelSelect').innerHTML = '<option value="">Auto</option>';
@@ -170,7 +170,10 @@ async function fetchModels() {
       <div style="background:var(--bg-card); padding:0.75rem; border-radius:6px; border:1px solid var(--border);">
         <div style="font-weight:500;">${m.name}</div>
         <div style="font-size:0.8rem; color:var(--text-muted);">${m.size_mb} MB</div>
-        <button class="secondary" style="margin-top:0.5rem; font-size:0.7rem;" onclick="selectModel('${m.name}')">Select</button>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+          <button class="secondary" style="font-size:0.7rem; padding:0.25rem 0.5rem;" onclick="selectModel('${m.name}')">Select</button>
+          <button class="danger" style="font-size:0.7rem; padding:0.25rem 0.5rem;" onclick="deleteModel('${m.name}')">Delete</button>
+        </div>
       </div>
     `).join('');
     // Update chat model dropdown
@@ -192,6 +195,23 @@ async function fetchModels() {
 function selectModel(name) {
   document.getElementById('chatModelSelect').value = name;
   addLog(`[MODEL] Selected: ${name}`);
+}
+
+// ----- Delete Model -----
+async function deleteModel(filename) {
+  if (!confirm(`Delete model "${filename}" from coordinator storage?`)) return;
+  try {
+    const res = await fetch(`/api/models/delete/${filename}`, { method: 'DELETE' });
+    if (res.ok) {
+      addLog(`[MODEL] Deleted ${filename}`);
+      fetchModels();
+    } else {
+      const err = await res.json();
+      alert(`Failed to delete: ${err.detail || 'Unknown error'}`);
+    }
+  } catch (e) {
+    alert(`Error deleting model: ${e.message}`);
+  }
 }
 
 // ----- Download from URL (to coordinator) -----
@@ -359,6 +379,30 @@ async function processImage(operation) {
     }
   } catch (e) {
     alert('Image processing failed: ' + e.message);
+  }
+}
+
+// ----- Background Removal -----
+async function removeBackground() {
+  const fileInput = document.getElementById('imageUpload');
+  const file = fileInput.files[0];
+  if (!file) { alert('Please select an image first.'); return; }
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/image/remove_bg', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      const img = document.getElementById('processedImage');
+      img.src = 'data:image/png;base64,' + data.image_base64;
+      img.style.display = 'block';
+      document.getElementById('imageMeta').textContent = 'Background removed';
+      addLog('[IMAGE] Background removed');
+    } else {
+      alert('Background removal failed.');
+    }
+  } catch (e) {
+    alert('Background removal failed: ' + e.message);
   }
 }
 
